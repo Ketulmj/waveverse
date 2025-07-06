@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres
+    container_name: next-postgres
+    environment:
+      POSTGRES_USER: pgusr
+      POSTGRES_PASSWORD: psswrd1
+      POSTGRES_DB: waveverse
+    ports:
+      - "5432:5432"
+    volumes:
+      - waveverse:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  waveverse:
