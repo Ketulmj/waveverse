@@ -1,47 +1,89 @@
 "use client"
 
-import React from "react"
+import React, { useEffect, useState } from "react"
 import { signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CanvasAnimation } from "@/components/canvas-animation"
-
-
-const handleSignupSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault()
-  const formData = new FormData(e.currentTarget)
-  const data = Object.fromEntries(formData.entries())
-  if (!data.name || !data.email || !data.password) {
-    alert("Please fill in all fields.")
-    return
-  }
-
-  const response = await fetch("/api/signup", {
-    method: "POST",
-    headers: {
-      'Content-Type': "application/json"
-    },
-    body: JSON.stringify(data)
-  });
-
-  const res = await response.json();
-  if (response.status !== 200) {
-    alert(res.message || "An unexpected error occurred. Please try again later.");
-    return;
-  } else {
-    window.location.href = "/dashboard";
-  }
-}
+import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 
 export default function SignupPage() {
+  const { status } = useSession()
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/dashboard")
+    }
+  }, [status, router])
+
+  if (status === "loading" || status === "authenticated") {
+    return <div className="flex min-h-svh flex-col items-center justify-center bg-black text-white">
+      Loading...
+    </div>
+  }
+
+  const handleSignupSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+
+    const formData = new FormData(e.currentTarget)
+    const data = Object.fromEntries(formData.entries())
+    const { name, email, password } = data
+
+    if (!name || !email || !password) {
+      setError("Please fill in all fields.")
+      setIsLoading(false)
+      return
+    }
+    try {
+      const signupResponse = await fetch("/api/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      })
+
+      if (!signupResponse.ok) {
+        const res = await signupResponse.json()
+        setError(res.message || "An error occurred during sign up.")
+        setIsLoading(false)
+        return
+      }
+
+      const signinResult = await signIn("credentials", {
+        email: email as string,
+        password: password as string,
+        redirect: false,
+      })
+
+      if (signinResult?.error) {
+        setError("Failed to sign in after creating account. Please try logging in.")
+        console.error("Sign-in error after signup:", signinResult.error)
+      } else if (signinResult?.ok) {
+        router.push("/dashboard")
+      }
+    } catch (error) {
+      console.error("Signup error: ", error)
+      setError("An unexpected error occurred. Please try again later.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-black p-6 md:p-10">
       <div className="w-full max-w-sm md:max-w-3xl">
         <Card className="overflow-hidden bg-black border-white/80">
           <CardContent className="grid p-0 md:grid-cols-2">
-            <form onSubmit={handleSignupSubmit} className="p-6 md:p-8 bg-black">
+            <form onSubmit={handleSignupSubmit} className="p-6 md:p-8 bg-black" noValidate>
               <div className="flex flex-col gap-6">
                 <div className="flex flex-col items-center text-center">
                   <h1 className="text-2xl font-bold text-white">Create an account</h1>
@@ -57,6 +99,7 @@ export default function SignupPage() {
                     type="text"
                     placeholder="Elon Musk"
                     required
+                    disabled={isLoading}
                     className="bg-white/90 text-black placeholder:text-black/50"
                   />
                 </div>
@@ -70,6 +113,7 @@ export default function SignupPage() {
                     type="email"
                     placeholder="spacex@example.com"
                     required
+                    disabled={isLoading}
                     className="bg-white/90 text-black border-white placeholder:text-black/50"
                   />
                 </div>
@@ -83,11 +127,13 @@ export default function SignupPage() {
                     type="password"
                     placeholder="••••••••"
                     required
+                    disabled={isLoading}
                     className="bg-white/90 text-black border-white placeholder:text-black/50"
                   />
                 </div>
-                <Button type="submit" className="w-full bg-white/90 text-black hover:bg-white/80 hover:cursor-pointer">
-                  Create Account
+                {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+                <Button type="submit" className="w-full bg-white/90 text-black hover:bg-white/80 hover:cursor-pointer" disabled={isLoading}>
+                  {isLoading ? "Creating Account..." : "Create Account"}
                 </Button>
                 <div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-white">
                   <span className="relative z-10 bg-black px-2 text-white/70">Or continue with</span>
@@ -95,8 +141,9 @@ export default function SignupPage() {
                 <div className="grid grid-cols-1 gap-4">
                   <Button
                     variant="outline"
-                    onClick={() => signIn("google")}
+                    onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
                     className="w-full border-white hover:bg-white/90 hover:text-black bg-black text-white hover:cursor-pointer"
+                    disabled={isLoading}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-5 h-5">
                       <path

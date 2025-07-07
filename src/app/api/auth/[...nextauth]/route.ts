@@ -29,7 +29,6 @@ export const authOptions: AuthOptions = {
         });
 
         if (!user || !user.password) {
-          // NextAuth will then redirect the user with an error message.
           return null;
         }
 
@@ -41,11 +40,13 @@ export const authOptions: AuthOptions = {
         if (!isValid) {
           return null;
         }
-
         return { id: user.id, name: user.name, email: user.email };
       },
     }),
   ],
+  pages: {
+    signIn: "/login",
+  },
   session: {
     strategy: "jwt",
   },
@@ -57,30 +58,29 @@ export const authOptions: AuthOptions = {
         return true;
       }
 
-      // For OAuth providers, check if the user exists or create them
+      // For OAuth providers
       if (account?.provider === "google") {
-        if (!user.email) return false; // Google should always provide an email
-
+        if (!user.email) return false;
+      
         try {
           const existingUser = await db.query.users.findFirst({
             where: eq(users.email, user.email),
           });
 
           if (!existingUser) {
-            // If user doesn't exist, create them
             await db.insert(users).values({
               email: user.email!,
               name: user.name!,
-              // OAuth users typically don't have a password in our db
+              avatarUrl: user.image
             });
           }
-          return true; // Allow sign-in
+          return true;
         } catch (error) {
           console.error("Error during OAuth sign-in DB check:", error);
-          return false; // Prevent sign-in on DB error
+          return false;
         }
       }
-      return false; // Deny sign-in for other providers by default
+      return false;
     },
     async jwt({ token, user }) {
       // The `user` object is only available on the first sign-in.

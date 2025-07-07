@@ -28,7 +28,6 @@ export async function POST(request: Request) {
     });
 
     if (existingUser) {
-      // 409 Conflict is a more appropriate status code here
       return NextResponse.json({ message: "User already exists" }, { status: 409 });
     }
 

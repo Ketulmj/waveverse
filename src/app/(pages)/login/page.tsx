@@ -1,61 +1,78 @@
 "use client"
 
-import React from "react"
-import { signIn } from "next-auth/react"
+import { useState, useEffect } from "react"
+import { signIn, useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { CanvasAnimation } from "@/components/canvas-animation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@radix-ui/react-label"
 
-const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault()
-  // Handle form submission logic here
-  const formData = new FormData(e.currentTarget)
-  const data = Object.fromEntries(formData.entries())
-
-  // fetch("/api/login", {
-  //   method: "POST",
-  //   headers: {
-  //     'Content-Type': "application/json"
-  //   },
-  //   body: JSON.stringify(data)
-  // }).then((response) => {
-  //   response.json();
-  //   console.log(response);
-  // }).then((res) => {
-  //   console.log(res);
-  //   // if (res.message === "User not exists") {
-  //   //   alert("User not exists, Please Signup!")
-  //   // }
-  //   // else if (res.message === "Incorrect password") {
-  //   //   alert("Incorrect password")
-  //   // }
-  //   // else if (res.message === "Login successful") {
-  //   //   window.location.href = "/dashboard";
-  //   // } else {
-  //   //   alert("An unexpected error occurred. Please try again later.")
-  //   // }
-  // })
-
-  const response = await fetch("/api/login", {
-    method: "POST",
-    headers: {
-      'Content-Type': "application/json"
-    },
-    body: JSON.stringify(data)
-  });
-
-  const res = await response.json();
-  if (response.status !== 200) {
-    alert(res.message || "An unexpected error occurred. Please try again later.");
-    return;
-  } else {
-    window.location.href = "/dashboard";
-  }
-}
-
 export default function LoginPage() {
+  const { status } = useSession()
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.push("/dashboard")
+    }
+  }, [status, router])
+
+  if (status === "loading" || status === "authenticated") {
+    return <div className="flex min-h-svh flex-col items-center justify-center bg-black text-white">
+      Loading...
+    </div>
+  }
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    try {
+      const result = await signIn("credentials", {
+        email: e.currentTarget.email.value,
+        password: e.currentTarget.password.value,
+        redirect: false,
+        // callbackUrl: "/dashboard",
+      })
+
+      if (result?.error) {
+        setError("Invalid email or password. Please try again.");
+        console.error("Sign-in error from NextAuth: ", result.error);
+      } else if (result?.ok) {
+        router.push("/dashboard");
+      }
+    } catch (error) {
+      console.error("Sign in error: ", error);
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+
+    // Handle form submission logic here
+    // const formData = new FormData(e.currentTarget)
+    // const data = Object.fromEntries(formData.entries())
+
+    // const response = await fetch("/api/login", {
+    //   method: "POST",
+    //   headers: {
+    //     'Content-Type': "application/json"
+    //   },
+    //   body: JSON.stringify(data)
+    // });
+
+    // const res = await response.json();
+    // if (response.status !== 200) {
+    //   alert(res.message || "An unexpected error occurred. Please try again later.");
+    //   return;
+    // } else {
+    //   window.location.href = "/dashboard";
+    // }
+  }
+
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-black p-6 md:p-10">
       <div className="w-full max-w-sm md:max-w-3xl">
@@ -110,7 +127,9 @@ export default function LoginPage() {
                 <div className="grid grid-cols-1 gap-4">
                   <Button
                     variant="outline"
-                    onClick={() => signIn("google")}
+                    onClick={() =>
+                      signIn("google", { callbackUrl: "/dashboard" })
+                    }
                     className="w-full border-white hover:bg-white/90 hover:text-black bg-black text-white"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-5 h-5">
